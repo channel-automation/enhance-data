@@ -123,6 +123,20 @@ app.get('/address', async (req, res) => {
   }
 });
 
+// Route: Get server's outgoing IP
+app.get('/ip', async (req, res) => {
+  try {
+    const response = await axios.get('https://httpbin.org/ip');
+    res.json({
+      message: 'Railway server outgoing IP',
+      ip: response.data.origin,
+      note: 'Add this IP to your Audience Acuity API whitelist'
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get IP address' });
+  }
+});
+
 // Default route - API info
 app.get('/', (req, res) => {
   res.json({
@@ -130,7 +144,8 @@ app.get('/', (req, res) => {
     endpoints: [
       'GET /phone?phone=15551234567&template=218923726',
       'GET /email?email=example@gmail.com&template=218923726',
-      'GET /address?address=123 Main St&template=218923726'
+      'GET /address?address=123 Main St&template=218923726',
+      'GET /ip - Get server outgoing IP for whitelisting'
     ],
     note: 'This proxy handles the dynamic Bearer token authentication automatically'
   });
