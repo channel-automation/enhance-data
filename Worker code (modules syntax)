@@ -1,0 +1,133 @@
+Here’s a Cloudflare Worker that hides your Key ID + Secret, generates the dynamic Authorization header (Bearer <KEY_ID><NOW><MD5(NOW+SECRET)>), calls AudienceAcuity, and returns the API’s JSON. You’ll hit your Worker endpoint with just a phone query param.
+
+
+/ package.json dependency you'll need:
+//   "blueimp-md5": "^2.19.0"
+ 
+import md5 from 'blueimp-md5';
+ 
+export default {
+  /**
+   * Env bindings (add via wrangler):
+   * - AA_KEY_ID
+   * - AA_SECRET
+   * - AA_ORIGIN  (optional, defaults below)
+   */
+  async fetch(request, env, ctx) {
+    try {
+      const url = new URL(request.url);
+      const phone = url.searchParams.get('phone');
+      const template = url.searchParams.get('template') || '79123584';
+      const origin = env.AA_ORIGIN || 'https://api.audienceacuity.com';
+ 
+      if (!phone) {
+        return json({ error: 'Missing required `phone` query param' }, 400);
+      }
+ 
+      // Build Authorization header: Bearer <KEY_ID><NOW><MD5(NOW+SECRET)>
+      const now = Date.now().toString(36);
+      const signature = md5(now + env.AA_SECRET);
+      const authorization = `Bearer ${env.AA_KEY_ID}${now}${signature}`;
+ 
+      const upstream = `${origin}/v2/identities/byPhone?phone=${encodeURIComponent(
+        phone
+      )}&template=${encodeURIComponent(template)}`;
+ 
+      const res = await fetch(upstream, {
+        headers: { Authorization: authorization },
+      });
+ 
+      // Pass through AA response (status + JSON)
+      const data = await res.json().catch(() => ({}));
+      return json(data, res.status);
+    } catch (err) {
+      return json({ error: 'Worker error', detail: String(err) }, 500);
+    }
+  },
+};
+ 
+function json(body, status = 200, extraHeaders = {}) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'access-control-allow-origin': '*',           // CORS: adjust if needed
+      'access-control-allow-methods': 'GET, OPTIONS',
+      ...extraHeaders,
+    },
+  });
+}
+
+2) wrangler.toml (minimal)
+ 
+name = "aa-proxy"
+
+main = "src/worker.js"
+
+compatibility_date = "2024-01-01"
+ 
+# If you want to serve on a route:
+
+# routes = [
+
+#   { pattern = "yourdomain.com/aa/*", zone_id = "<your-zone-id>" }
+
+# ]
+ 
+# Or for dev/testing:
+
+# workers_dev = true
+
+ 
+3) Install & configure
+ 
+# in your project
+
+npm i blueimp-md5
+ 
+# add secrets (they’ll be stored securely by Cloudflare)
+
+wrangler secret put AA_KEY_ID
+
+wrangler secret put AA_SECRET
+ 
+# optional (if you want to override origin)
+
+wrangler secret put AA_ORIGIN    # e.g. https://api.audienceacuity.com
+ 
+# run locally
+
+wrangler dev
+ 
+# deploy
+
+wrangler publish
+
+Audience Acuity API
+ 
+4) Call your Worker
+ 
+# Your Worker URL will look like:
+
+# https://aa-proxy.<your-subdomain>.workers.dev?phone=15551234567
+
+curl "https://aa-proxy.<your-subdomain>.workers.dev?phone=15551234567"
+
+ 
+my questions: so we dont need to worry about those Bearer <KEY_ID><NOW><MD5(NOW+SECRET)> ? our worker will take care of those dynamically when we request and we can just use our worker url endpoint?
+ChatGPT said:
+
+Answer:
+✅ Exactly — you got it.
+Once you deploy the Cloudflare Worker with your Key ID and Secret stored as secure secrets:
+The Worker automatically generates the Bearer <KEY_ID><NOW><MD5(NOW+SECRET)> header every time a request comes in.
+You never have to calculate NOW or MD5 yourself.
+From your app, Postman, or curl, you just call your Worker endpoint, e.g.:
+curl "https://aa-proxy.<your-subdomain>.workers.dev?phone=15551234567" 
+And the Worker will:
+Take your request (phone=...)
+Build the correct Authorization header dynamically
+Forward the call to AudienceAcuity’s API
+Return the JSON response to you
+So yes 👍 — you can treat your Worker URL as the “real API endpoint” and forget about the complicated bearer format.
+ 

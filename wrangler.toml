@@ -1,0 +1,11 @@
+name = "audience-acuity-proxy"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+account_id = "208f128290b10d58d5de18909148acc0"
+
+[vars]
+AA_ORIGIN = "https://api.audienceacuity.com"
+
+# To set secrets, run:
+# wrangler secret put AA_KEY_ID
+# wrangler secret put AA_SECRET
