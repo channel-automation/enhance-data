@@ -12,8 +12,8 @@ app.use(express.json());
 
 // Configuration
 const config = {
-  keyId: process.env.AA_KEY_ID || 'bmq5wd7LiBfRzXGu',
-  secret: process.env.AA_SECRET || 'KHhBHY9dbnA9WZexjRaVeIAp5nn7GFpb',
+  keyId: process.env.AA_KEY_ID || 'RtbTYKU0MRMBFDyK',
+  secret: process.env.AA_SECRET || 'mIyr8FfEfu3BypFWxB8gMfwzF2hdOpqE',
   origin: process.env.AA_ORIGIN || 'https://api.audienceacuity.com'
 };
 

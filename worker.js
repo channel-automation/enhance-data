@@ -18,8 +18,8 @@ export default {
       }
 
       // Get environment variables (fallback to provided credentials for demo)
-      const keyId = env.AA_KEY_ID || 'bmq5wd7LiBfRzXGu';
-      const secret = env.AA_SECRET || 'KHhBHY9dbnA9WZexjRaVeIAp5nn7GFpb';
+      const keyId = env.AA_KEY_ID || 'RtbTYKU0MRMBFDyK';
+      const secret = env.AA_SECRET || 'mIyr8FfEfu3BypFWxB8gMfwzF2hdOpqE';
       const origin = env.AA_ORIGIN || 'https://api.audienceacuity.com';
 
       // Generate dynamic Authorization header
