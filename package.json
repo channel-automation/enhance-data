@@ -4,16 +4,21 @@
   "description": "Proxy server for Audience Acuity API with dynamic authentication",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node start-servers.js",
+    "start:proxy": "node server.js",
+    "start:mysql": "node mysql-endpoint.js",
+    "start:both": "node start-servers.js",
     "dev": "wrangler dev",
-    "deploy": "wrangler publish",
+    "deploy": "wrangler deploy",
     "tail": "wrangler tail"
   },
   "dependencies": {
     "axios": "^1.6.7",
     "blueimp-md5": "^2.19.0",
     "cors": "^2.8.5",
-    "express": "^4.18.2"
+    "dotenv": "^17.2.2",
+    "express": "^4.21.2",
+    "mysql2": "^3.14.4"
   },
   "devDependencies": {
     "wrangler": "^3.0.0"
