@@ -5,7 +5,7 @@ account_id = "208f128290b10d58d5de18909148acc0"
 
 [vars]
 AA_ORIGIN = "https://api.audienceacuity.com"
-MYSQL_API_URL = "https://your-mysql-api.up.railway.app"
+MYSQL_API_URL = "https://enhance-data-production.up.railway.app"
 
 # D1 Database binding
 [[d1_databases]]

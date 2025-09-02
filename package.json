@@ -2,12 +2,13 @@
   "name": "audience-acuity-proxy",
   "version": "1.0.0",
   "description": "Proxy server for Audience Acuity API with dynamic authentication",
-  "main": "server.js",
+  "main": "combined-server.js",
   "scripts": {
-    "start": "node start-servers.js",
+    "start": "node combined-server.js",
     "start:proxy": "node server.js",
     "start:mysql": "node mysql-endpoint.js",
     "start:both": "node start-servers.js",
+    "start:combined": "node combined-server.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail"
