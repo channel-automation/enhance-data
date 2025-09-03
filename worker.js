@@ -825,6 +825,22 @@ export default {
         }
       }
 
+      // Proxy to MySQL API - Metrics endpoints
+      if (pathname.startsWith('/mysql/metrics/')) {
+        const metricsPath = pathname.replace('/mysql/metrics/', '');
+        const queryString = url.search;
+        try {
+          const response = await fetch(`${MYSQL_API_URL}/api/metrics/${metricsPath}${queryString}`);
+          const data = await response.json();
+          return jsonResponse(data);
+        } catch (error) {
+          return jsonResponse({ 
+            error: `Failed to fetch metrics: ${metricsPath}`, 
+            detail: error.message 
+          }, 500);
+        }
+      }
+
       // Default route - API info
       if (pathname === '/' || pathname === '/info') {
         return jsonResponse({
@@ -846,6 +862,11 @@ export default {
             'GET /mysql/data/{tableName} - Get data from any table (supports pagination)',
             'GET /mysql/bot-users - Get bot users with filtering',
             'POST /mysql/query - Execute custom SELECT query'
+          ],
+          metrics_endpoints: [
+            'GET /mysql/metrics/teams - List all teams with activity stats',
+            'GET /mysql/metrics/teams/{team_id} - Detailed team metrics',
+            'GET /mysql/metrics/bot-users - Bot user metrics by status/date range'
           ],
           dashboard: [
             'GET /dashboard - Interactive data visualization dashboard'

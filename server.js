@@ -416,6 +416,176 @@ app.post('/api/query', async (req, res) => {
   }
 });
 
+// ============================================
+// METRICS ENDPOINTS
+// ============================================
+
+// Get bot user metrics by team/workspace
+app.get('/api/metrics/bot-users', async (req, res) => {
+  const { 
+    team_id,
+    days = 30,
+    status = 'pending,open'
+  } = req.query;
+
+  try {
+    // Parse status parameter
+    const statusList = status.split(',').map(s => s.trim().toLowerCase());
+    const statusPlaceholders = statusList.map(() => '?').join(',');
+    
+    // Build base query
+    let query = `
+      SELECT 
+        team_id,
+        status,
+        COUNT(*) as count,
+        DATE(created_at) as date,
+        MAX(created_at) as latest_created,
+        MIN(created_at) as earliest_created
+      FROM bot_users 
+      WHERE status IN (${statusPlaceholders})
+        AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+    `;
+    
+    let params = [...statusList, parseInt(days)];
+    
+    // Add team_id filter if provided
+    if (team_id) {
+      query += ' AND team_id = ?';
+      params.push(team_id);
+    }
+    
+    query += ' GROUP BY team_id, status, DATE(created_at) ORDER BY date DESC, team_id';
+    
+    const [rows] = await pool.execute(query, params);
+    
+    // Also get summary statistics
+    let summaryQuery = `
+      SELECT 
+        team_id,
+        status,
+        COUNT(*) as total_count,
+        COUNT(DISTINCT DATE(created_at)) as active_days
+      FROM bot_users 
+      WHERE status IN (${statusPlaceholders})
+        AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+    `;
+    
+    let summaryParams = [...statusList, parseInt(days)];
+    
+    if (team_id) {
+      summaryQuery += ' AND team_id = ?';
+      summaryParams.push(team_id);
+    }
+    
+    summaryQuery += ' GROUP BY team_id, status ORDER BY total_count DESC';
+    
+    const [summary] = await pool.execute(summaryQuery, summaryParams);
+    
+    res.json({
+      success: true,
+      period_days: parseInt(days),
+      status_filter: statusList,
+      team_id: team_id || 'all',
+      daily_breakdown: rows,
+      summary: summary,
+      total_records: rows.reduce((sum, row) => sum + row.count, 0)
+    });
+    
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get team/workspace list with recent activity
+app.get('/api/metrics/teams', async (req, res) => {
+  const { days = 30 } = req.query;
+  
+  try {
+    const query = `
+      SELECT 
+        team_id,
+        COUNT(*) as total_users,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count,
+        COUNT(CASE WHEN status = 'open' THEN 1 END) as open_count,
+        COUNT(CASE WHEN status = 'done' THEN 1 END) as done_count,
+        COUNT(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL ? DAY) THEN 1 END) as recent_users,
+        MAX(created_at) as latest_activity,
+        MIN(created_at) as first_activity
+      FROM bot_users 
+      GROUP BY team_id 
+      ORDER BY recent_users DESC, total_users DESC
+    `;
+    
+    const [rows] = await pool.execute(query, [parseInt(days)]);
+    
+    res.json({
+      success: true,
+      period_days: parseInt(days),
+      teams: rows,
+      total_teams: rows.length
+    });
+    
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get detailed metrics for a specific team
+app.get('/api/metrics/teams/:team_id', async (req, res) => {
+  const { team_id } = req.params;
+  const { days = 30 } = req.query;
+  
+  try {
+    // Get overall team stats
+    const teamQuery = `
+      SELECT 
+        team_id,
+        COUNT(*) as total_users,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count,
+        COUNT(CASE WHEN status = 'open' THEN 1 END) as open_count,
+        COUNT(CASE WHEN status = 'done' THEN 1 END) as done_count,
+        COUNT(CASE WHEN status = 'invalid' THEN 1 END) as invalid_count,
+        COUNT(CASE WHEN status = 'spam' THEN 1 END) as spam_count,
+        COUNT(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL ? DAY) THEN 1 END) as recent_users,
+        MAX(created_at) as latest_activity,
+        MIN(created_at) as first_activity
+      FROM bot_users 
+      WHERE team_id = ?
+      GROUP BY team_id
+    `;
+    
+    const [teamStats] = await pool.execute(teamQuery, [parseInt(days), team_id]);
+    
+    // Get daily breakdown for pending/open users
+    const dailyQuery = `
+      SELECT 
+        DATE(created_at) as date,
+        status,
+        COUNT(*) as count
+      FROM bot_users 
+      WHERE team_id = ? 
+        AND status IN ('pending', 'open')
+        AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+      GROUP BY DATE(created_at), status 
+      ORDER BY date DESC
+    `;
+    
+    const [dailyBreakdown] = await pool.execute(dailyQuery, [team_id, parseInt(days)]);
+    
+    res.json({
+      success: true,
+      team_id: parseInt(team_id),
+      period_days: parseInt(days),
+      team_stats: teamStats[0] || null,
+      daily_pending_open: dailyBreakdown
+    });
+    
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Start server with MySQL initialization
 async function startServer() {
   const initialized = await initializePool();
@@ -435,6 +605,10 @@ async function startServer() {
       console.log('  GET  /api/bot-users - Get bot users');
       console.log('  POST /api/query - Execute SELECT query');
       console.log('  GET  /api/health - MySQL health check');
+      console.log('\n=== Metrics Endpoints ===');
+      console.log('  GET  /api/metrics/teams - List all teams with activity');
+      console.log('  GET  /api/metrics/teams/:id - Detailed team metrics');
+      console.log('  GET  /api/metrics/bot-users - Bot user metrics by status/date');
     }
   });
 }
