@@ -2,9 +2,9 @@
   "name": "audience-acuity-proxy",
   "version": "1.0.0",
   "description": "Proxy server for Audience Acuity API with dynamic authentication",
-  "main": "combined-server.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node combined-server.js",
+    "start": "node server.js",
     "start:proxy": "node server.js",
     "start:mysql": "node mysql-endpoint.js",
     "start:both": "node start-servers.js",

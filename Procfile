@@ -1,1 +1,1 @@
-web: node combined-server.js
+web: node server.js
