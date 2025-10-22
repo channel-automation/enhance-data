@@ -17,9 +17,9 @@ export default {
         });
       }
 
-      // Get environment variables (fallback to provided credentials for demo)
-      const keyId = env.AA_KEY_ID || 'RtbTYKU0MRMBFDyK';
-      const secret = env.AA_SECRET || 'mIyr8FfEfu3BypFWxB8gMfwzF2hdOpqE';
+      // Get environment variables (fallback to working credentials)
+      const keyId = env.AA_KEY_ID || 'lT1r4xawA6hnPgDZ';
+      const secret = env.AA_SECRET || 'KBiBi5ndtvbNcAqZ2zSkuBPgzGQwPHs6';
       const origin = env.AA_ORIGIN || 'https://api.audienceacuity.com';
       const db = env.DB; // D1 database binding
 
@@ -162,55 +162,97 @@ export default {
       // Save Audience Acuity data to D1 database
       if (pathname === '/save-identity' && request.method === 'POST') {
         if (!db) {
-          return jsonResponse({ 
-            error: 'Database not configured. Please bind D1 database to worker.' 
+          return jsonResponse({
+            error: 'Database not configured. Please bind D1 database to worker.'
           }, 500);
         }
 
         try {
           const body = await request.json();
-          const { phone, workspace_id, audience_acuity_data } = body;
-          
-          if (!phone || !workspace_id || !audience_acuity_data) {
-            return jsonResponse({ 
-              error: 'Missing required fields: phone, workspace_id, audience_acuity_data' 
+          console.log('Save identity request received:', JSON.stringify(body).substring(0, 200));
+
+          // Extract from nested result object
+          const result = body.result || body;
+          const { phone, workspace_id, audience_acuity_data } = result;
+
+          // Detailed validation with specific error messages
+          if (!phone) {
+            console.error('Validation failed: Missing phone field');
+            return jsonResponse({
+              error: 'Missing required field: phone',
+              received_fields: Object.keys(result),
+              hint: 'Expected structure: { result: { phone, workspace_id, audience_acuity_data } } or flat structure'
+            }, 400);
+          }
+
+          if (!workspace_id) {
+            console.error('Validation failed: Missing workspace_id field');
+            return jsonResponse({
+              error: 'Missing required field: workspace_id',
+              received_fields: Object.keys(result),
+              hint: 'workspace_id is required for data isolation'
+            }, 400);
+          }
+
+          if (!audience_acuity_data) {
+            console.error('Validation failed: Missing audience_acuity_data field');
+            return jsonResponse({
+              error: 'Missing required field: audience_acuity_data',
+              received_fields: Object.keys(result),
+              hint: 'audience_acuity_data should contain the Audience Acuity API response'
             }, 400);
           }
 
           // Validate phone format (basic)
           const cleanPhone = phone.replace(/\D/g, '');
           if (cleanPhone.length < 10) {
-            return jsonResponse({ 
-              error: 'Invalid phone number format' 
+            console.error('Validation failed: Invalid phone format', phone);
+            return jsonResponse({
+              error: 'Invalid phone number format',
+              provided_phone: phone,
+              cleaned_phone: cleanPhone,
+              hint: 'Phone must contain at least 10 digits'
             }, 400);
           }
 
           // Extract first identity from Audience Acuity response
           const identities = audience_acuity_data.identities || [];
           if (identities.length === 0) {
-            return jsonResponse({ 
-              error: 'No identities found in audience_acuity_data' 
+            console.error('Validation failed: No identities in audience_acuity_data');
+            return jsonResponse({
+              error: 'No identities found in audience_acuity_data',
+              audience_acuity_data_keys: Object.keys(audience_acuity_data),
+              hint: 'audience_acuity_data.identities array is empty or missing'
             }, 400);
           }
+
+          console.log(`Processing identity for phone: ${cleanPhone}, workspace: ${workspace_id}, identity_id: ${identities[0].id}`);
 
           const identity = identities[0]; // Use first identity
           const now = new Date().toISOString();
 
           // Insert main identity record
-          await db.prepare(`
-            INSERT OR REPLACE INTO identities (
-              phone, workspace_id, identity_id, first_name, last_name, address, city, state, zip, zip4,
-              county_name, latitude, longitude, gender, birth_date, address_id, household_id,
-              has_email, has_phone, validated, updated_at, raw_response
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).bind(
-            cleanPhone, workspace_id, identity.id || null, identity.firstName || null, identity.lastName || null,
-            identity.address || null, identity.city || null, identity.state || null, identity.zip || null, identity.zip4 || null,
-            identity.countyName || null, identity.latitude || null, identity.longitude || null, identity.gender || null,
-            identity.birthDate || null, identity.addressId || null, identity.householdId || null,
-            identity.hasEmail ? 1 : 0, identity.hasPhone ? 1 : 0, identity.validated ? 1 : 0,
-            now, JSON.stringify(audience_acuity_data)
-          ).run();
+          try {
+            console.log('Inserting main identity record...');
+            await db.prepare(`
+              INSERT OR REPLACE INTO identities (
+                phone, workspace_id, identity_id, first_name, last_name, address, city, state, zip, zip4,
+                county_name, latitude, longitude, gender, birth_date, address_id, household_id,
+                has_email, has_phone, validated, updated_at, raw_response
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).bind(
+              cleanPhone, workspace_id, identity.id || null, identity.firstName || null, identity.lastName || null,
+              identity.address || null, identity.city || null, identity.state || null, identity.zip || null, identity.zip4 || null,
+              identity.countyName || null, identity.latitude || null, identity.longitude || null, identity.gender || null,
+              identity.birthDate || null, identity.addressId || null, identity.householdId || null,
+              identity.hasEmail ? 1 : 0, identity.hasPhone ? 1 : 0, identity.validated ? 1 : 0,
+              now, JSON.stringify(audience_acuity_data)
+            ).run();
+            console.log('Main identity record inserted successfully');
+          } catch (error) {
+            console.error('Failed to insert main identity:', error.message);
+            throw new Error(`Identity insert failed: ${error.message}`);
+          }
 
           // Clear existing related data
           await db.prepare('DELETE FROM identity_phones WHERE phone = ? AND workspace_id = ?').bind(cleanPhone, workspace_id).run();
@@ -228,76 +270,119 @@ export default {
           };
 
           // Insert related records
-          if (identity.phones) {
-            for (const phone of identity.phones) {
-              await db.prepare(`
-                INSERT INTO identity_phones (
-                  phone, workspace_id, associated_phone, carrier, phone_type, added_date,
-                  update_date, last_seen_date, rank_order, quality_level, activity_status, contactability_score
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-              `).bind(
-                cleanPhone, workspace_id, phone.phone?.toString(), phone.carrier, phone.phoneType,
-                phone.addedDate, phone.updateDate, phone.lastSeenDate, phone.rankOrder,
-                phone.qualityLevel, phone.activityStatus, phone.contactabilityScore
-              ).run();
-              recordsCreated.phones++;
+          if (identity.phones && identity.phones.length > 0) {
+            console.log(`Inserting ${identity.phones.length} phone records...`);
+            try {
+              for (const phone of identity.phones) {
+                await db.prepare(`
+                  INSERT INTO identity_phones (
+                    phone, workspace_id, associated_phone, carrier, phone_type, added_date,
+                    update_date, last_seen_date, rank_order, quality_level, activity_status, contactability_score
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `).bind(
+                  cleanPhone, workspace_id, phone.phone?.toString() || null, phone.carrier || null, phone.phoneType || null,
+                  phone.addedDate || null, phone.updateDate || null, phone.lastSeenDate || null, phone.rankOrder || null,
+                  phone.qualityLevel || null, phone.activityStatus || null, phone.contactabilityScore || null
+                ).run();
+                recordsCreated.phones++;
+              }
+              console.log(`${recordsCreated.phones} phone records inserted`);
+            } catch (error) {
+              console.error('Failed to insert phone records:', error.message);
+              throw new Error(`Phone insert failed: ${error.message}`);
             }
           }
 
           if (identity.data) {
-            const data = identity.data;
-            await db.prepare(`
-              INSERT INTO identity_data (
-                phone, workspace_id, address_type, income_level, credit_range, household_income,
-                home_ownership, home_price, home_value, occupation_category, marital_status,
-                home_furnishing, home_improvement, discretionary_income
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).bind(
-              cleanPhone, workspace_id, data.addressType, data.incomeLevel, data.creditRange,
-              data.householdIncome, data.homeOwnership, data.homePrice, data.homeValue,
-              data.occupationCategory, data.maritalStatus,
-              data.homeFurnishing ? 1 : 0, data.homeImprovement ? 1 : 0,
-              identity.finances?.discretionaryIncome
-            ).run();
-          }
-
-          if (identity.devices) {
-            for (const device of identity.devices) {
-              await db.prepare('INSERT INTO identity_devices (phone, workspace_id, device_id, os) VALUES (?, ?, ?, ?)').bind(
-                cleanPhone, workspace_id, device.deviceId, device.os
-              ).run();
-              recordsCreated.devices++;
-            }
-          }
-
-          if (identity.behaviors) {
-            for (const behavior of identity.behaviors) {
-              await db.prepare('INSERT INTO identity_behaviors (phone, workspace_id, iab_category, recency) VALUES (?, ?, ?, ?)').bind(
-                cleanPhone, workspace_id, behavior.iab, behavior.recency
-              ).run();
-              recordsCreated.behaviors++;
-            }
-          }
-
-          if (identity.properties) {
-            for (const property of identity.properties) {
+            console.log('Inserting demographic data...');
+            try {
+              const data = identity.data;
               await db.prepare(`
-                INSERT INTO identity_properties (
-                  phone, workspace_id, property_id, property_address_id, property_address, property_city,
-                  property_state, property_zip, consumer_owned, owner_occupied, property_type, property_value,
-                  improvement_value, assessed_value, year_built, year_built_range, building_sqft, rooms,
-                  bedrooms, tax_year, recorded_date, sale_date, sale_amount, estimated_value
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO identity_data (
+                  phone, workspace_id, address_type, income_level, credit_range, household_income,
+                  home_ownership, home_price, home_value, occupation_category, marital_status,
+                  home_furnishing, home_improvement, discretionary_income
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
               `).bind(
-                cleanPhone, workspace_id, property.propertyId, property.addressId, property.address,
-                property.city, property.state, property.zip, property.consumerOwned ? 1 : 0,
-                property.ownerOccupied ? 1 : 0, property.propertyType, property.value,
-                property.improvementValue, property.assessedValue, property.yearBuilt,
-                property.yearBuiltRange, property.assessedBuildingSqFt || property.buildingSqFt,
-                property.rooms, property.bedrooms, property.taxYear, property.recordedDate,
-                property.saleDate, property.saleAmount, property.estimatedValue
+                cleanPhone, workspace_id,
+                data.addressType || null,
+                data.incomeLevel || null,
+                data.creditRange || null,
+                data.householdIncome || null,
+                data.homeOwnership || null,
+                data.homePrice || null,
+                data.homeValue || null,
+                data.occupationCategory || null,
+                data.maritalStatus || null,
+                data.homeFurnishing ? 1 : 0,
+                data.homeImprovement ? 1 : 0,
+                identity.finances?.discretionaryIncome || null
               ).run();
-              recordsCreated.properties++;
+              console.log('Demographic data inserted');
+            } catch (error) {
+              console.error('Failed to insert demographic data:', error.message, 'Data:', JSON.stringify(identity.data));
+              throw new Error(`Demographic data insert failed: ${error.message}`);
+            }
+          }
+
+          if (identity.devices && identity.devices.length > 0) {
+            console.log(`Inserting ${identity.devices.length} device records...`);
+            try {
+              for (const device of identity.devices) {
+                await db.prepare('INSERT INTO identity_devices (phone, workspace_id, device_id, os) VALUES (?, ?, ?, ?)').bind(
+                  cleanPhone, workspace_id, device.deviceId || null, device.os || null
+                ).run();
+                recordsCreated.devices++;
+              }
+              console.log(`${recordsCreated.devices} device records inserted`);
+            } catch (error) {
+              console.error('Failed to insert device records:', error.message);
+              throw new Error(`Device insert failed: ${error.message}`);
+            }
+          }
+
+          if (identity.behaviors && identity.behaviors.length > 0) {
+            console.log(`Inserting ${identity.behaviors.length} behavior records...`);
+            try {
+              for (const behavior of identity.behaviors) {
+                await db.prepare('INSERT INTO identity_behaviors (phone, workspace_id, iab_category, recency) VALUES (?, ?, ?, ?)').bind(
+                  cleanPhone, workspace_id, behavior.iab || null, behavior.recency || null
+                ).run();
+                recordsCreated.behaviors++;
+              }
+              console.log(`${recordsCreated.behaviors} behavior records inserted`);
+            } catch (error) {
+              console.error('Failed to insert behavior records:', error.message);
+              throw new Error(`Behavior insert failed: ${error.message}`);
+            }
+          }
+
+          if (identity.properties && identity.properties.length > 0) {
+            console.log(`Inserting ${identity.properties.length} property records...`);
+            try {
+              for (const property of identity.properties) {
+                await db.prepare(`
+                  INSERT INTO identity_properties (
+                    phone, workspace_id, property_id, property_address_id, property_address, property_city,
+                    property_state, property_zip, consumer_owned, owner_occupied, property_type, property_value,
+                    improvement_value, assessed_value, year_built, year_built_range, building_sqft, rooms,
+                    bedrooms, tax_year, recorded_date, sale_date, sale_amount, estimated_value
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `).bind(
+                  cleanPhone, workspace_id, property.propertyId || null, property.addressId || null, property.address || null,
+                  property.city || null, property.state || null, property.zip || null, property.consumerOwned ? 1 : 0,
+                  property.ownerOccupied ? 1 : 0, property.propertyType || null, property.value || null,
+                  property.improvementValue || null, property.assessedValue || null, property.yearBuilt || null,
+                  property.yearBuiltRange || null, property.assessedBuildingSqFt || property.buildingSqFt || null,
+                  property.rooms || null, property.bedrooms || null, property.taxYear || null, property.recordedDate || null,
+                  property.saleDate || null, property.saleAmount || null, property.estimatedValue || null
+                ).run();
+                recordsCreated.properties++;
+              }
+              console.log(`${recordsCreated.properties} property records inserted`);
+            } catch (error) {
+              console.error('Failed to insert property records:', error.message);
+              throw new Error(`Property insert failed: ${error.message}`);
             }
           }
           
