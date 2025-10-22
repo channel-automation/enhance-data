@@ -234,21 +234,34 @@ export default {
           // Insert main identity record
           try {
             console.log('Inserting main identity record...');
+
+            // Extract match scores from root level of audience_acuity_data
+            const nameMatch = audience_acuity_data.nameMatch || null;
+            const addressMatch = audience_acuity_data.addressMatch !== undefined ? (audience_acuity_data.addressMatch ? 1 : 0) : null;
+            const creditScore = audience_acuity_data.creditScore || null;
+            const maritalStatusMatch = audience_acuity_data.maritalStatus || null;
+            const householdIncomeMatch = audience_acuity_data.householdIncome || null;
+            const totalScore = audience_acuity_data.Totalscore || audience_acuity_data.totalScore || null;
+
+            console.log(`Match scores - Name: ${nameMatch}, Address: ${addressMatch}, Credit: ${creditScore}, Total: ${totalScore}`);
+
             await db.prepare(`
               INSERT OR REPLACE INTO identities (
                 phone, workspace_id, identity_id, first_name, last_name, address, city, state, zip, zip4,
                 county_name, latitude, longitude, gender, birth_date, address_id, household_id,
-                has_email, has_phone, validated, updated_at, raw_response
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                has_email, has_phone, validated, updated_at, raw_response,
+                name_match, address_match, credit_score, marital_status_match, household_income_match, total_score
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).bind(
               cleanPhone, workspace_id, identity.id || null, identity.firstName || null, identity.lastName || null,
               identity.address || null, identity.city || null, identity.state || null, identity.zip || null, identity.zip4 || null,
               identity.countyName || null, identity.latitude || null, identity.longitude || null, identity.gender || null,
               identity.birthDate || null, identity.addressId || null, identity.householdId || null,
               identity.hasEmail ? 1 : 0, identity.hasPhone ? 1 : 0, identity.validated ? 1 : 0,
-              now, JSON.stringify(audience_acuity_data)
+              now, JSON.stringify(audience_acuity_data),
+              nameMatch, addressMatch, creditScore, maritalStatusMatch, householdIncomeMatch, totalScore
             ).run();
-            console.log('Main identity record inserted successfully');
+            console.log('Main identity record inserted successfully with match scores');
           } catch (error) {
             console.error('Failed to insert main identity:', error.message);
             throw new Error(`Identity insert failed: ${error.message}`);
@@ -399,9 +412,14 @@ export default {
 
         } catch (error) {
           console.error('Database save error:', error);
-          return jsonResponse({ 
+          console.error('Error stack:', error.stack);
+          return jsonResponse({
             error: 'Failed to save identity data',
-            detail: error.message
+            detail: error.message,
+            error_type: error.name,
+            phone: request.headers.get('x-debug') ? cleanPhone : undefined,
+            workspace_id: request.headers.get('x-debug') ? workspace_id : undefined,
+            hint: 'Check that all required fields are present and D1 database is properly configured. Add "x-debug: true" header for more details.'
           }, 500);
         }
       }

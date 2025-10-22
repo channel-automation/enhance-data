@@ -1,0 +1,140 @@
+{
+  "status": "ok",
+  "result": {
+    "phone": "4085101918",
+    "workspace_id": "3213",
+    "audience_acuity_data": {
+      "input": {
+        "phone": "+14154305641"
+      },
+      "identities": [
+        {
+          "id": 611201954,
+          "firstName": "Ada",
+          "lastName": "Luong",
+          "address": "16 Stanton Ct",
+          "city": "Orinda",
+          "state": "CA",
+          "zip": "94563",
+          "zip4": "1628",
+          "dpbc": "169",
+          "carrierRoute": "C017",
+          "fipsStateCode": "06",
+          "fipsCountyCode": "013",
+          "countyName": "Contra Costa",
+          "latitude": 37.89199,
+          "longitude": -122.20695,
+          "addressType": "S",
+          "cbsa": "41860",
+          "censusTract": "354001",
+          "censusBlockGroup": "1",
+          "censusBlock": "1009",
+          "gender": "F",
+          "hasEmail": true,
+          "hasPhone": true,
+          "dpv": "169",
+          "dma": 807,
+          "msa": 7362,
+          "congressionalDistrict": "10",
+          "urbanicityCode": "S",
+          "validated": true,
+          "birthDate": "1985-05-04",
+          "addressId": 28019385,
+          "householdId": 1515525230,
+          "phones": [
+            {
+              "phone": 5106015482,
+              "carrier": "Pacific Bell",
+              "addedDate": "2025-08-14",
+              "updateDate": "2025-08-14",
+              "phoneType": 1,
+              "rankOrder": 1,
+              "qualityLevel": 1,
+              "activityStatus": "I4",
+              "contactabilityScore": "J"
+            }
+          ],
+          "data": {
+            "addressType": "Street",
+            "incomeLevel": "GT_150K",
+            "creditRange": "800+",
+            "householdIncome": "$700K to $999K",
+            "homeOwnership": "Renter",
+            "homePrice": 999999,
+            "homeValue": 2293500,
+            "maritalStatus": "Single",
+            "recentHomeGoodsLivingPurchasesDollars": 9999,
+            "recentHomeGoodsLivingPurchasesAvgDollars": "501 to 1000",
+            "homeFurnishing": false,
+            "homeImprovement": false,
+            "age": 40,
+            "birthYear": 1985
+          },
+          "devices": [
+            {
+              "deviceId": "be639bc7357e4dfbafa1b1f2eb8de78e",
+              "os": "iOS"
+            },
+            {
+              "deviceId": "737a4f152c5b45038b0390f3d09655b9",
+              "os": "Android"
+            },
+            {
+              "deviceId": "2c5d701dd0bd406ba1a9e16f3fb3fc89",
+              "os": "Android"
+            }
+          ],
+          "finances": [],
+          "properties": [
+            {
+              "propertyId": 5738076366226,
+              "addressId": 28019385,
+              "id": 2305878104,
+              "first": "Austin",
+              "middle": "J",
+              "last": "Fain",
+              "id2": 611201954,
+              "first2": "Ada",
+              "last2": "Luong",
+              "consumerOwned": true,
+              "address": "16 Stanton Ct",
+              "city": "Orinda",
+              "state": "CA",
+              "zip": "94563",
+              "countyName": "Contra Costa",
+              "ownerOccupied": true,
+              "propertyType": "Single Family Residence",
+              "value": 2016295,
+              "valueType": "Assessed",
+              "improvementValue": 530604,
+              "improvementValueType": "Assessed",
+              "assessedValue": 2016295,
+              "yearBuilt": 1958,
+              "yearBuiltRange": "1950 to 1959",
+              "assessedBuildingSqFt": 2153,
+              "buildingSqFt": 2153,
+              "rooms": "8",
+              "bedrooms": "3",
+              "taxYear": 2024,
+              "recordedDate": "2021-07-27",
+              "saleDate": "2021-07-27",
+              "saleAmount": 1900000,
+              "loanToValue": 43,
+              "loanAmount": 822000,
+              "loanDate": "2021-05-26",
+              "mortgageType": "Conventional",
+              "estimatedValue": 1861000
+            }
+          ]
+        }
+      ],
+      "nameMatch": "Partial Match",
+      "addressMatch": true,
+      "creditScore": "B",
+      "maritalStatus": "Married",
+      "householdIncome": "$150K to $174K",
+      "Totalscore": 59
+    }
+  },
+  "executionTime": "4ms"
+}
